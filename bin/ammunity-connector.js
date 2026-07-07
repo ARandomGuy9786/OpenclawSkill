@@ -26,6 +26,7 @@ import { ask, askHidden, askSelect, confirm, readStdinLine } from "../installer/
 import { preflight, hasClaudeLogin } from "../installer/system.js";
 import { defaultHome, placeRuntime, installDeps, writeEnv } from "../installer/runtime.js";
 import { installService, uninstallService } from "../installer/service.js";
+import { ensureAndUploadKey } from "../installer/keygen.js";
 
 const VERSION = "0.1.0";
 const COORDINATOR_DEFAULT = "https://ammunity-coordinator-production.up.railway.app";
@@ -81,6 +82,7 @@ Options:
   --home <dir>                   install home (default: ~/.ammunity/connector)
   --start                        (receive) run the daemon in the foreground after install
   --skip-deps                    don't run npm install
+  --rotate-key                   generate a FRESH agent keypair (default: reuse the existing one)
   --no-service                   (receive) don't install a systemd/launchd service
   --non-interactive, -y          don't prompt; take values from flags/env
   --uninstall                    remove the install home (and its service, if any)
@@ -243,6 +245,23 @@ async function main() {
     mkdirSync(home, { recursive: true });
     writeEnv(home, answers, log);
   }
+
+  // ── keypair (Phase 2.1) ──────────────────────────────────────────────────
+  // The connector owns all crypto: generate (or reuse) an Ed25519 keypair in
+  // the install home, then upload ONLY the public key. The private key
+  // (agent.key, chmod 600) never leaves the host and is never logged. Reuses
+  // an existing key unless --rotate-key is passed; a corrupt key regenerates.
+  // Non-fatal: an upload failure warns but doesn't block the install.
+  await ensureAndUploadKey(
+    {
+      home: placedHome,
+      coordinatorUrl: coordinatorUrl || COORDINATOR_DEFAULT,
+      agentId,
+      agentKey,
+      rotate: Boolean(args["rotate-key"]),
+    },
+    (m) => log(m)
+  );
 
   // ── report + next steps ───────────────────────────────────────────────
   console.log("");

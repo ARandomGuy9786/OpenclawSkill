@@ -1,5 +1,8 @@
 # Secrets — never commit
 .env
+# Agent private key (generated per-host in the runtime home; never in the repo)
+agent.key
+*.key
 
 # Dependencies (reinstalled via `npm install` on deploy)
 node_modules/
