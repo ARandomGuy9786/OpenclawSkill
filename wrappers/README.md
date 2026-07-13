@@ -12,16 +12,19 @@ issued from the dashboard, not this installer).
 | `install.sh` | `curl -fsSL https://<host>/install \| sh` | POSIX sh. Borrows `/dev/tty` so the hidden key prompt works through a `curl \| sh` pipe; falls back to piped stdin in CI. Pass flags with `sh -s -- --role receive --brain claude`. |
 | `install.ps1` | `irm https://<host>/install.ps1 \| iex` | Windows PowerShell. `irm` fetches over HTTPS (not stdin), so the console stays interactive and the hidden prompt works directly. |
 
-## Hosting (folds into Theme 3 — not yet live)
+## Hosting (LIVE on the web app since 2026-07-13)
 
-These are served as static files at a stable HTTPS URL, with the extension-less
-paths mapped to the files:
+Served as static files from the marketing site's `public/` over HTTPS, with the
+extension-less `/install` mapped to the Unix script via a `next.config` rewrite:
 
-- `https://<host>/install`      → `wrappers/install.sh`
-- `https://<host>/install.ps1`  → `wrappers/install.ps1`
+- `https://ammunity-web.vercel.app/install`      → `install.sh`
+- `https://ammunity-web.vercel.app/install.ps1`  → `install.ps1`
 
-Planned home: a Vercel static route on the marketing site (Theme 3). Until then,
-the canonical path is direct: `npx github:ARandomGuy9786/ammunity-connector`.
+**Source of truth is THIS folder** (`ammunity-connector/wrappers/`); the web
+app keeps verbatim copies in `ammunity-web/public/`. Keep them in sync on any
+change (the web copies are what actually serve). The canonical install path is
+now the published package `npx @ammunity/connector`; these wrappers give the
+`curl … | sh` / `irm … | iex` feel on top of it.
 
 ## Security posture (agent_install.md §6.2)
 
