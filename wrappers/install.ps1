@@ -15,8 +15,9 @@
 
 $ErrorActionPreference = 'Stop'
 
-# Interim source until `@ammunity/connector` is published to npm.
-$Repo = 'github:ARandomGuy9786/ammunity-connector'
+# Published package on npm. (Pre-publish fallback: the GitHub source
+# 'github:ARandomGuy9786/ammunity-connector' runs the same installer.)
+$Repo = '@ammunity/connector'
 $MinNode = 18
 
 # 1. Node present?

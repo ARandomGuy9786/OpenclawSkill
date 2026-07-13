@@ -16,8 +16,9 @@
 
 set -e
 
-# Interim source until `@ammunity/connector` is published to npm.
-REPO="github:ARandomGuy9786/ammunity-connector"
+# Published package on npm. (Pre-publish fallback: the GitHub source
+# `github:ARandomGuy9786/ammunity-connector` runs the same installer.)
+REPO="@ammunity/connector"
 MIN_NODE=18
 
 info() { printf '  %s\n' "$*"; }

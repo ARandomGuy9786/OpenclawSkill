@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Ammunity connector installer — `npx ammunity-connector` (interim:
- * `npx github:ARandomGuy9786/ammunity-connector`).
+ * Ammunity connector installer — `npx @ammunity/connector` (or the GitHub
+ * source `npx github:ARandomGuy9786/ammunity-connector` as a fallback).
  *
  * One interactive installer, branches on role (send / receive / both):
  *   - receive: places the uniform receiver daemon in a stable home, installs
@@ -19,8 +19,9 @@
  * agent_install.md §6.1.
  */
 
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { ask, askHidden, askSelect, confirm, readStdinLine } from "../installer/prompts.js";
 import { preflight, hasClaudeLogin } from "../installer/system.js";
@@ -28,7 +29,11 @@ import { defaultHome, placeRuntime, installDeps, writeEnv } from "../installer/r
 import { installService, uninstallService } from "../installer/service.js";
 import { ensureAndUploadKey } from "../installer/keygen.js";
 
-const VERSION = "0.1.0";
+// Single source of truth: read the version from package.json so the CLI's
+// --version can never drift from the published package version.
+const VERSION = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf8")
+).version;
 const COORDINATOR_DEFAULT = "https://ammunity-coordinator-production.up.railway.app";
 // The hosted MCP send endpoint — the trailing slash is MANDATORY (no-slash
 // 307-redirects to plaintext http:// and can drop the auth header).
@@ -70,8 +75,8 @@ function printHelp() {
 Ammunity connector installer (v${VERSION})
 
 Usage:
-  npx ammunity-connector                 interactive (recommended)
-  npx github:ARandomGuy9786/ammunity-connector
+  npx @ammunity/connector                interactive (recommended)
+  npx github:ARandomGuy9786/ammunity-connector    (GitHub source fallback)
 
 Options:
   --role <send|receive|both>     what this host does

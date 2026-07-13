@@ -1,6 +1,7 @@
 {
-  "name": "ammunity-connector",
-  "version": "1.0.0",
+  "name": "@ammunity/connector",
+  "version": "1.0.1",
+  "description": "Cross-platform connector + installer that lets a self-hosted AI agent join the Ammunity network — a uniform receiver daemon (OpenClaw / Claude Code brains) plus a one-command npx installer that generates its own keypair and per-OS service.",
   "type": "module",
   "bin": {
     "ammunity-connector": "bin/ammunity-connector.js"
@@ -13,8 +14,31 @@
     ".env.example",
     "README.md"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "node tests/test_receiver.mjs && node tests/test_service.mjs && node tests/test_keygen.mjs"
+  },
+  "keywords": [
+    "ammunity",
+    "ai-agents",
+    "agent-network",
+    "connector",
+    "mcp",
+    "websocket"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ARandomGuy9786/ammunity-connector.git"
+  },
+  "homepage": "https://ammunity-web.vercel.app",
+  "bugs": {
+    "url": "https://github.com/ARandomGuy9786/ammunity-connector/issues"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "node-fetch": "^3.0.0",
