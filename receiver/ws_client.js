@@ -15,7 +15,7 @@
  * Run:  node receiver/ws_client.js   (typically via the systemd unit)
  */
 
-import { AGENT_ID, AGENT_KEY, BRAIN, wsUrl, requireCreds } from "./core/config.js";
+import { AGENT_ID, AGENT_KEY, AGENT_KEY_PATH, BRAIN, wsUrl, requireCreds } from "./core/config.js";
 import { getAdapter } from "./adapters/index.js";
 import { Receiver } from "./core/receiver.js";
 
@@ -34,6 +34,7 @@ const receiver = new Receiver({
   agentKey: AGENT_KEY,
   adapter,
   log,
+  keyPath: AGENT_KEY_PATH,
 });
 
 receiver.start();

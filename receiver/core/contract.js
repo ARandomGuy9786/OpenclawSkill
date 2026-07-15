@@ -76,3 +76,106 @@ export function parseAsk(text) {
   const m = /^ASK:\s*(.+)$/i.exec(firstLine);
   return m ? m[1].trim() : null;
 }
+
+// ── Tier-2 session verbs (SYNC-3 §9) ─────────────────────────────────────────
+// Three additions to the brain's plain-text vocabulary — taught by the connector
+// with progressive disclosure. The brain still never sees frames, keys, nonces,
+// or signatures (principle 4). Verbs:
+//   - consent to an invite: first line `ACCEPT`  or  `DECLINE: <reason>`
+//   - end an open session:  first line `CLOSE: <closing note>`
+//   - send a file:          any line  `FILE: <path>`  (A3 — not sent this build)
+
+// Helper: the trimmed first non-empty-prefixed line of a reply.
+function firstLine(text) {
+  return String(text == null ? "" : text)
+    .replace(/^\s+/, "")
+    .split(/\r?\n/, 1)[0]
+    .trim();
+}
+
+// Render a `session.invite` for the brain (layer-4 runtime consent). Plain text:
+// WHO is asking, the purpose, the community, and the EXACT reply convention.
+export function renderInvite({ partnerName, partnerAgentId, ownerLabel, purpose, communitySlug }) {
+  const who = partnerName || partnerAgentId || "another agent";
+  const owner = ownerLabel ? ` (operated by ${ownerLabel})` : "";
+  const community = communitySlug ? `\nCommunity: ${communitySlug}` : "";
+  return (
+    `${who}${owner} wants to open a live, multi-turn session with you.` +
+    community +
+    `\n\nWhat they want to do:\n${purpose || "(no purpose given)"}` +
+    `\n\nDo you want to accept this session? Reply with EXACTLY one line, and nothing else:\n` +
+    `  ACCEPT\n` +
+    `  DECLINE: <short reason>\n` +
+    `Anything whose first line is not exactly "ACCEPT" is treated as a decline (fail-closed).`
+  );
+}
+
+// Parse the consent reply. First-line `ACCEPT` (exact word, case-insensitive) =
+// accept. `DECLINE: <reason>` captures the reason. ANYTHING ELSE is a decline
+// (fail-closed, SYNC-3 §9) with the whole reply text as the reason.
+export function parseConsent(text) {
+  const raw = String(text == null ? "" : text);
+  const first = firstLine(raw);
+  if (/^ACCEPT$/i.test(first)) return { accept: true, reason: "" };
+  const m = /^DECLINE:\s*(.*)$/i.exec(first);
+  if (m) return { accept: false, reason: m[1].trim() };
+  return { accept: false, reason: raw.trim() };
+}
+
+// Render an in-session turn for the brain: the purpose, the running transcript
+// (You:/Partner: lines), the new inbound message, and the two in-session verbs.
+// For the initiator's OPENING turn (inbound == null) there is no partner message
+// yet, so the brain is told to open the conversation toward the purpose.
+export function renderSessionTurn({ purpose, partnerName, transcript, inbound }) {
+  const who = partnerName || "your partner";
+  const lines = [`You are in a live session with ${who}.`];
+  if (purpose) lines.push(`Session purpose: ${purpose}`);
+
+  const t = Array.isArray(transcript) ? transcript : [];
+  if (t.length) {
+    lines.push("", "Conversation so far:");
+    for (const turn of t) {
+      lines.push(`${turn.who === "You" ? "You" : "Partner"}: ${turn.text}`);
+    }
+  }
+
+  lines.push("");
+  if (inbound == null) {
+    lines.push(`Open the conversation: send ${who} a first message that moves toward the purpose above.`);
+  } else {
+    lines.push(`${who} just said:`, inbound, "", "Reply to continue the session.");
+  }
+
+  lines.push(
+    "",
+    "How your reply is handled:",
+    "- Normal text is sent to your partner as your next message.",
+    "- To END the session, make the FIRST line exactly: CLOSE: <short closing note>.",
+    "- To send a file, put FILE: <path> on its own line (within your session workdir)."
+  );
+  return lines.join("\n");
+}
+
+// Parse an in-session reply. `CLOSE:` on the FIRST line ends the session (the
+// note becomes the close reason). `FILE:` on ANY line is extracted (A3); the
+// remaining text is the message body.
+export function parseSessionReply(text) {
+  const raw = String(text == null ? "" : text);
+  const closeMatch = /^CLOSE:\s*(.*)$/i.exec(firstLine(raw));
+
+  const fileLines = [];
+  const kept = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const fm = /^\s*FILE:\s*(.+)$/i.exec(line);
+    if (fm) {
+      fileLines.push(fm[1].trim());
+      continue;
+    }
+    kept.push(line);
+  }
+
+  if (closeMatch) {
+    return { close: true, closeNote: closeMatch[1].trim(), fileLines, body: "" };
+  }
+  return { close: false, closeNote: "", fileLines, body: kept.join("\n").trim() };
+}

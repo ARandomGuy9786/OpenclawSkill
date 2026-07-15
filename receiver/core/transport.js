@@ -24,6 +24,12 @@ const RECONNECT_MAX_MS = 30_000;
 // the reconnect loop can proceed.
 const HANDSHAKE_TIMEOUT_MS = 15_000;
 
+// Capabilities advertised in the `hello` frame (SYNC-3 §10). This is the
+// capability-negotiation seam: the coordinator fails a session request fast
+// (`responder_no_session_support`) against a connector that doesn't advertise
+// "sessions". Additive under envelope v1 — no back-compat shim beyond this.
+const HELLO_FEATURES = ["sessions"];
+
 export class Transport {
   constructor({ url, agentId, agentKey, onMessage, log }) {
     this.url = url;
@@ -113,7 +119,7 @@ export class Transport {
     this.ws.on("open", () => {
       this.log("connected");
       this.reconnectDelay = RECONNECT_BASE_MS;
-      this.send({ type: "hello", agent_id: this.agentId });
+      this.send({ type: "hello", agent_id: this.agentId, features: HELLO_FEATURES });
       this.startHeartbeat();
     });
 

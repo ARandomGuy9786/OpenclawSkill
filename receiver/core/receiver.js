@@ -35,11 +35,13 @@
  *     lock isn't required yet.
  */
 
+import { existsSync } from "node:fs";
 import { Transport } from "./transport.js";
+import { SessionEngine } from "./sessions.js";
 import { renderFresh, renderReplay, renderAnswerTurn, parseAsk } from "./contract.js";
 
 export class Receiver {
-  constructor({ url, agentId, agentKey, adapter, log }) {
+  constructor({ url, agentId, agentKey, adapter, log, keyPath }) {
     this.adapter = adapter;
     this.log = log || (() => {});
     this.transport = new Transport({
@@ -49,6 +51,29 @@ export class Receiver {
       log: this.log,
       onMessage: (msg) => this.onMessage(msg),
     });
+
+    // Tier-2 sessions are ADDITIVE and opt-in on having a signing key: no
+    // agent.key → sessions stay off and Tier-1 is entirely unaffected.
+    this.sessions = null;
+    if (keyPath && existsSync(keyPath)) {
+      try {
+        this.sessions = new SessionEngine({
+          transport: this.transport,
+          adapter,
+          // coordinatorUrl + home default from core/config.js inside the engine
+          // (the same env the ws client uses); agentKey is needed for the file
+          // upload/download + catch-up HTTP calls (§4, §7).
+          config: { agentId, keyPath, agentKey },
+          log: this.log,
+        });
+        this.log(`sessions enabled (Tier-2) — signing with ${keyPath}`);
+      } catch (e) {
+        this.log(`sessions disabled: could not load agent.key (${e.message})`);
+        this.sessions = null;
+      }
+    } else {
+      this.log("sessions disabled: no agent.key (re-run the installer)");
+    }
   }
 
   start() {
@@ -56,7 +81,15 @@ export class Receiver {
   }
 
   async onMessage(msg) {
-    if (!msg || msg.type !== "task") return;
+    if (!msg) return;
+    // Session frames route to the Tier-2 engine (additive). The Tier-1 task path
+    // below is untouched and runs for `task` frames exactly as before.
+    if (typeof msg.type === "string" && msg.type.startsWith("session.")) {
+      if (this.sessions) await this.sessions.handle(msg);
+      else this.log(`ignoring ${msg.type}: sessions disabled (no agent.key)`);
+      return;
+    }
+    if (msg.type !== "task") return;
 
     const taskId = msg.task_id;
     const isRedelivery =
