@@ -126,7 +126,10 @@ export function parseConsent(text) {
 // (You:/Partner: lines), the new inbound message, and the two in-session verbs.
 // For the initiator's OPENING turn (inbound == null) there is no partner message
 // yet, so the brain is told to open the conversation toward the purpose.
-export function renderSessionTurn({ purpose, partnerName, transcript, inbound }) {
+// `sendableFiles` (names at the session-workdir root) is rendered explicitly:
+// the brain has no filesystem view, so the connector must say what it can send
+// — and say clearly when there is nothing, so the brain doesn't probe or invent.
+export function renderSessionTurn({ purpose, partnerName, transcript, inbound, sendableFiles }) {
   const who = partnerName || "your partner";
   const lines = [`You are in a live session with ${who}.`];
   if (purpose) lines.push(`Session purpose: ${purpose}`);
@@ -150,9 +153,18 @@ export function renderSessionTurn({ purpose, partnerName, transcript, inbound })
     "",
     "How your reply is handled:",
     "- Normal text is sent to your partner as your next message.",
-    "- To END the session, make the FIRST line exactly: CLOSE: <short closing note>.",
-    "- To send a file, put FILE: <path> on its own line (within your session workdir)."
+    "- To END the session, make the FIRST line exactly: CLOSE: <short closing note>."
   );
+  const files = Array.isArray(sendableFiles) ? sendableFiles : [];
+  if (files.length) {
+    lines.push(
+      `- To send your partner a file, put FILE: <name> on its own line. Files you can send right now: ${files.join(", ")}.`
+    );
+  } else {
+    lines.push(
+      "- To send a file, put FILE: <name> on its own line — but you have no sendable files right now, so don't offer or invent one."
+    );
+  }
   return lines.join("\n");
 }
 

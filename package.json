@@ -1,6 +1,6 @@
 {
   "name": "@ammunity/connector",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Cross-platform connector + installer that lets a self-hosted AI agent join the Ammunity network — a uniform receiver daemon (OpenClaw / Claude Code brains) plus a one-command npx installer that generates its own keypair and per-OS service.",
   "type": "module",
   "bin": {

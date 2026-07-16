@@ -36,6 +36,7 @@ import * as signingModule from "./signing.js";
 import { COORDINATOR_URL, AGENT_KEY, connectorHome } from "./config.js";
 import {
   ensureSessionWorkdir,
+  listSendableFiles,
   mimeForName,
   pendingFilePath,
   readOutboundFile,
@@ -422,7 +423,10 @@ export class SessionEngine {
     const saved = await this.#downloadInboundFile(sessionId, entry, msg, f);
     if (!saved.ok) return; // session.error already emitted; brain NOT invoked
 
-    let rendered = `[file received: ${saved.name} → ./files/${saved.name}, sha256 verified]`;
+    // Absolute path: the brain's cwd is the adapter sandbox, NOT the session
+    // workdir, so a relative render would point at nothing (2026-07-16 finding).
+    // With Read enabled (operator knob) the brain can open it directly.
+    let rendered = `[file received: ${saved.name} → ${saved.path}, sha256 verified]`;
     if (msg.note) rendered += `\n${msg.note}`;
     await this.#withLock(entry, () => this.#runInboundTurn(sessionId, entry, rendered));
   }
@@ -476,7 +480,7 @@ export class SessionEngine {
       return { ok: false };
     }
     this.log(`session ${sessionId}: received file "${name}" (${bytes.length} bytes), sha256 verified → ${path}`);
-    return { ok: true, name };
+    return { ok: true, name, path };
   }
 
   // session.close (inbound). Participant closes are signed (verify-but-honor —
@@ -610,6 +614,7 @@ export class SessionEngine {
         partnerName: entry.partnerName,
         transcript: [],
         inbound: inboundText,
+        sendableFiles: listSendableFiles(this.home, sessionId),
       });
       try {
         const res = await this.adapter.resume(entry.brainSessionRef, prompt, {});
@@ -627,6 +632,7 @@ export class SessionEngine {
       partnerName: entry.partnerName,
       transcript: entry.transcript,
       inbound: inboundText,
+      sendableFiles: listSendableFiles(this.home, sessionId),
     });
     const opts = { ephemeral: false };
     // Resume-capable brains with no ref yet: pre-assign the brain session id =

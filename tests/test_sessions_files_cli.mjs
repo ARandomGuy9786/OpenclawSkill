@@ -16,7 +16,8 @@ import { join } from "node:path";
 import { SessionEngine } from "../receiver/core/sessions.js";
 import * as signing from "../receiver/core/signing.js";
 import { buildSessionRequest, parseArgs, runCli, writePendingFile } from "../receiver/session_cli.js";
-import { pendingFilePath } from "../receiver/core/files.js";
+import { listSendableFiles, pendingFilePath } from "../receiver/core/files.js";
+import { renderSessionTurn } from "../receiver/core/contract.js";
 
 let passed = 0;
 function pass(name) {
@@ -264,7 +265,9 @@ await (async () => {
     assert.ok(readFileSync(saved).equals(content), "saved bytes match");
     assert.equal(adapter.prompts.length, promptsBefore + 1, "the brain ran one turn for the file");
     const lastPrompt = adapter.prompts[adapter.prompts.length - 1].prompt;
-    assert.match(lastPrompt, /\[file received: notes\.txt → \.\/files\/notes\.txt, sha256 verified\]/, "brain prompt renders the [file received] line");
+    // The render must carry the ABSOLUTE saved path — the brain's cwd is the
+    // adapter sandbox, not the session workdir (2026-07-16 live-gate finding).
+    assert.ok(lastPrompt.includes(`[file received: notes.txt → ${saved}, sha256 verified]`), "brain prompt renders the [file received] line with the absolute path");
     assert.ok(!transport.sent.some((f) => f.type === "session.error"), "no session.error on a clean transfer");
     pass("(3) inbound session.file → downloaded, hash-verified, saved, rendered to the brain");
   }
@@ -465,6 +468,27 @@ await (async () => {
     const close = transport.sent.find((f) => f.type === "session.close");
     assert.ok(close && close.reason === "unknown_session", "unknown session.open → session.close(unknown_session)");
     pass("(7b) session.open for an unknown session with no pending handoff → close(unknown_session)");
+  }
+
+  // ── (8) sendable-file legibility (2026-07-16 live-gate fix) ─────────────────
+  // listSendableFiles lists workdir-ROOT regular files only (received files live
+  // under files/), and renderSessionTurn tells the brain exactly what it can
+  // send — or that it has nothing, so it doesn't probe or invent.
+  {
+    const SID = "f9999999-0000-4000-8000-000000000009";
+    const home = freshHome();
+    assert.deepEqual(listSendableFiles(home, SID), [], "no workdir yet → empty list, no throw");
+    mkdirSync(join(home, "sessions", SID, "files"), { recursive: true });
+    writeFileSync(join(home, "sessions", SID, "report.csv"), "a,b\n1,2\n");
+    writeFileSync(join(home, "sessions", SID, "brief.md"), "# brief\n");
+    writeFileSync(join(home, "sessions", SID, "files", "inbound.txt"), "from partner");
+    assert.deepEqual(listSendableFiles(home, SID), ["brief.md", "report.csv"], "root files listed sorted; files/ (received) excluded");
+
+    const withFiles = renderSessionTurn({ purpose: "p", transcript: [], inbound: "hi", sendableFiles: ["report.csv"] });
+    assert.ok(withFiles.includes("Files you can send right now: report.csv"), "turn prompt lists sendable files");
+    const withoutFiles = renderSessionTurn({ purpose: "p", transcript: [], inbound: "hi", sendableFiles: [] });
+    assert.ok(withoutFiles.includes("no sendable files right now"), "turn prompt says clearly when there is nothing to send");
+    pass("(8) sendable files are legible to the brain (listed when present, denied when absent)");
   }
 
   rmSync(HOME_ROOT, { recursive: true, force: true });

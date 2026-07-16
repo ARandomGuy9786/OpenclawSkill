@@ -13,7 +13,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { basename, extname, join, resolve, sep } from "node:path";
 
 // Minimal, sensible extension→MIME map (SYNC-3 §7). Anything else defaults to
@@ -57,6 +57,26 @@ export function ensureSessionWorkdir(home, sessionId) {
   const filesDir = sessionFilesDir(home, sessionId);
   mkdirSync(filesDir, { recursive: true });
   return { workdir, filesDir };
+}
+
+/**
+ * Names of regular files at the session workdir ROOT — the brain's sendable
+ * set, rendered into every turn prompt. A tool-less brain cannot discover its
+ * workdir (2026-07-16 live-gate finding: both brains honestly reported "my
+ * workdir is empty" and the file legs never ran), so the connector must make
+ * the workdir legible. Received files live under files/ and are announced on
+ * arrival; only the root is offered as sendable. Sorted; capped.
+ */
+export function listSendableFiles(home, sessionId, cap = 20) {
+  try {
+    return readdirSync(sessionWorkdir(home, sessionId), { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => e.name)
+      .sort()
+      .slice(0, cap);
+  } catch {
+    return []; // workdir not created yet — nothing to send
+  }
 }
 
 /** Best-effort recursive removal of a session's workdir (no-op if absent). */
